@@ -662,29 +662,26 @@ class PromptServer:
 
         @routes.post("/interrupt")
         async def post_interrupt(request):
-            json_data = await request.json()
-            current_queue = self.prompt_queue.get_current_queue()
-            queue_running = current_queue[0]
-            queue_pending = current_queue[1]
-            running_prompt_id = queue_running[0][1]
-            pending_prompt_ids = [x[1] for x in queue_pending]
-            prompt_id = json_data.get("prompt_id")
-            if prompt_id == running_prompt_id:
+            if request.can_read_body:
+                json_data = await request.json()
+                current_queue = self.prompt_queue.get_current_queue()
+                queue_running = current_queue[0]
+                queue_pending = current_queue[1]
+                running_prompt_id = queue_running[0][1]
+                pending_prompt_ids = [x[1] for x in queue_pending]
+                prompt_id = json_data.get("prompt_id")
+                if prompt_id == running_prompt_id:
+                    nodes.interrupt_processing()
+                elif prompt_id in pending_prompt_ids and prompt_id is not None:
+
+                    def delete_func(a):
+                        return a[1] == prompt_id
+
+                    self.prompt_queue.delete_queue_item(delete_func)
+                return web.json_response(status=200, data={"interrupted": prompt_id})
+
+            else:  # For ComfyUI GUI users
                 nodes.interrupt_processing()
-                return web.json_response(
-                    status=200, data={"interrupted": running_prompt_id}
-                )
-            elif prompt_id in pending_prompt_ids and prompt_id is not None:
-
-                def delete_func(a):
-                    return a[1] == prompt_id
-
-                self.prompt_queue.delete_queue_item(delete_func)
-
-            elif prompt_id is None:  # For ComfyUI GUI users
-                nodes.interrupt_processing()
-
-            return web.json_response(status=400, data={"reason": "prompt id unmatch"})
 
         @routes.post("/free")
         async def post_free(request):

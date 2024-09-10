@@ -127,8 +127,7 @@ class PromptServer:
             try:
                 # Send initial state to the new client
                 await self.send(
-                    "status", {"status": self.get_queue_info(),
-                               "sid": sid}, sid
+                    "status", {"status": self.get_queue_info(), "sid": sid}, sid
                 )
                 # On reconnect if we are the currently executing client send the current node
                 if self.client_id == sid and self.last_node_id is not None:
@@ -145,8 +144,7 @@ class PromptServer:
 
         @routes.get("/")
         async def get_root(request):
-            response = web.FileResponse(
-                os.path.join(self.web_root, "index.html"))
+            response = web.FileResponse(os.path.join(self.web_root, "index.html"))
             response.headers["Cache-Control"] = "no-cache"
             response.headers["Pragma"] = "no-cache"
             response.headers["Expires"] = "0"
@@ -237,8 +235,7 @@ class PromptServer:
                 full_output_folder = os.path.join(
                     upload_dir, os.path.normpath(subfolder)
                 )
-                filepath = os.path.abspath(
-                    os.path.join(full_output_folder, filename))
+                filepath = os.path.abspath(os.path.join(full_output_folder, filename))
 
                 if os.path.commonpath((upload_dir, filepath)) != upload_dir:
                     return web.Response(status=400)
@@ -332,8 +329,7 @@ class PromptServer:
                         # alpha copy
                         new_alpha = mask_pil.getchannel("A")
                         original_pil.putalpha(new_alpha)
-                        original_pil.save(
-                            filepath, compress_level=4, pnginfo=metadata)
+                        original_pil.save(filepath, compress_level=4, pnginfo=metadata)
 
             return image_upload(post, image_save_function)
 
@@ -341,8 +337,7 @@ class PromptServer:
         async def view_image(request):
             if "filename" in request.rel_url.query:
                 filename = request.rel_url.query["filename"]
-                filename, output_dir = folder_paths.annotated_filepath(
-                    filename)
+                filename, output_dir = folder_paths.annotated_filepath(filename)
 
                 # validation for security: prevent accessing arbitrary path
                 if filename[0] == "/" or ".." in filename:
@@ -374,8 +369,7 @@ class PromptServer:
                 if os.path.isfile(file):
                     if "preview" in request.rel_url.query:
                         with Image.open(file) as img:
-                            preview_info = request.rel_url.query["preview"].split(
-                                ";")
+                            preview_info = request.rel_url.query["preview"].split(";")
                             image_format = preview_info[0]
                             if image_format not in [
                                 "webp",
@@ -393,8 +387,7 @@ class PromptServer:
                                 or request.rel_url.query.get("channel", "") == "rgb"
                             ):
                                 img = img.convert("RGB")
-                            img.save(buffer, format=image_format,
-                                     quality=quality)
+                            img.save(buffer, format=image_format, quality=quality)
                             buffer.seek(0)
 
                             return web.Response(
@@ -454,8 +447,7 @@ class PromptServer:
                     else:
                         return web.FileResponse(
                             file,
-                            headers={
-                                "Content-Disposition": f'filename="{filename}"'},
+                            headers={"Content-Disposition": f'filename="{filename}"'},
                         )
 
             return web.Response(status=404)
@@ -472,12 +464,10 @@ class PromptServer:
             if not filename.endswith(".safetensors"):
                 return web.Response(status=404)
 
-            safetensors_path = folder_paths.get_full_path(
-                folder_name, filename)
+            safetensors_path = folder_paths.get_full_path(folder_name, filename)
             if safetensors_path is None:
                 return web.Response(status=404)
-            out = comfy.utils.safetensors_header(
-                safetensors_path, max_size=1024 * 1024)
+            out = comfy.utils.safetensors_header(safetensors_path, max_size=1024 * 1024)
             if out is None:
                 return web.Response(status=404)
             dt = json.loads(out)
@@ -544,8 +534,7 @@ class PromptServer:
                 else node_class
             )
             info["description"] = (
-                obj_class.DESCRIPTION if hasattr(
-                    obj_class, "DESCRIPTION") else ""
+                obj_class.DESCRIPTION if hasattr(obj_class, "DESCRIPTION") else ""
             )
             info["python_module"] = getattr(
                 obj_class, "RELATIVE_PYTHON_MODULE", "nodes"
@@ -678,11 +667,22 @@ class PromptServer:
             queue_running = current_queue[0]
             queue_pending = current_queue[1]
             running_prompt_id = queue_running[0][1]
-            if json_data["prompt_id"] == running_prompt_id:
+            pending_prompt_ids = [x[1] for x in queue_pending]
+            prompt_id = json_data.get("prompt_id")
+            if prompt_id == running_prompt_id:
                 nodes.interrupt_processing()
                 return web.json_response(
                     status=200, data={"interrupted": running_prompt_id}
                 )
+            elif prompt_id in pending_prompt_ids and prompt_id is not None:
+
+                def delete_func(a):
+                    return a[1] == prompt_id
+
+                self.prompt_queue.delete_queue_item(delete_func)
+
+            elif prompt_id is None:  # For ComfyUI GUI users
+                nodes.interrupt_processing()
 
             return web.json_response(status=400, data={"reason": "prompt id unmatch"})
 
@@ -806,8 +806,7 @@ class PromptServer:
 
     def encode_bytes(self, event, data):
         if not isinstance(event, int):
-            raise RuntimeError(
-                f"Binary event types must be integers, got {event}")
+            raise RuntimeError(f"Binary event types must be integers, got {event}")
 
         packed = struct.pack(">I", event)
         message = bytearray(packed)
@@ -859,8 +858,7 @@ class PromptServer:
             await send_socket_catch_exception(self.sockets[sid].send_json, message)
 
     def send_sync(self, event, data, sid=None):
-        self.loop.call_soon_threadsafe(
-            self.messages.put_nowait, (event, data, sid))
+        self.loop.call_soon_threadsafe(self.messages.put_nowait, (event, data, sid))
 
     def queue_updated(self):
         self.send_sync("status", {"status": self.get_queue_info()})
@@ -890,8 +888,7 @@ class PromptServer:
         if verbose:
             logging.info("Starting server\n")
             logging.info(
-                "To see the GUI go to: {}://{}:{}".format(
-                    scheme, address, port)
+                "To see the GUI go to: {}://{}:{}".format(scheme, address, port)
             )
         if call_on_start is not None:
             call_on_start(scheme, address, port)
